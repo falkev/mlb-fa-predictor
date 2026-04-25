@@ -1,0 +1,10 @@
+Pitching — stat_G, stat_GS, stat_IP, stat_W, stat_L, stat_SV, stat_ERA, stat_FIP, stat_WHIP, stat_ERA+,
+stat_H9, stat_HR9, stat_BB9, stat_SO9, stat_SO/BB, stat_BB, stat_SO, stat_HR, stat_WAR, stat_stat_SO_W
+
+
+Hitting — stat_G, stat_PA, stat_AB, stat_HR, stat_R, stat_RBI, stat_SB, stat_BB, stat_SO, stat_BA, stat_OBP,
+stat_SLG, stat_OPS, stat_OPS+, stat_TB, stat_2B, stat_3B, stat_WAR, stat_rOBA, stat_Rbat+, stat_stat_ISO, stat_stat_BB_K
+
+
+
+Context — Age, Years
