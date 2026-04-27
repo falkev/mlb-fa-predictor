@@ -16,8 +16,8 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────────────────────────────────────
 
 DATA_PATH = "mlb_fa_data_cleaned - mlb fa_training_data_v1.csv.csv"
+TEST_PATH = "mlb_fa_2026.csv"
 TARGET = "AAV"
-TEST_YEARS = [2024, 2025]
 RANDOM_SEED = 42
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -218,15 +218,15 @@ def run_ablation(train_df, pos_type, feature_groups):
 # EXPERIMENT 2 — Historical window
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_historical_window(df, pos_type, feature_list):
+def run_historical_window(df, test_df, pos_type, feature_list):
     print(f"\n{'=' * 55}")
     print(f"RF EXPERIMENT 2: HISTORICAL WINDOW — {pos_type.upper()}S")
     print(f"{'=' * 55}")
 
     sub = df[df["pos_type"] == pos_type]
-    test = sub[sub["FA_Year"].isin(TEST_YEARS)]
-    train_years = sorted(y for y in sub["FA_Year"].unique() if y not in TEST_YEARS)
-    X_test, y_test, _ = prepare_xy(test, feature_list)
+    test_sub = test_df[test_df["pos_type"] == pos_type]
+    train_years = sorted(sub["FA_Year"].unique())
+    X_test, y_test, _ = prepare_xy(test_sub, feature_list)
 
     windows = {
         "Last 3 yrs": train_years[-3:],
@@ -297,8 +297,8 @@ def run_unified_vs_split(train_df, test_df):
 
 def main():
     df = load_and_prepare(DATA_PATH)
-    train_df = df[~df["FA_Year"].isin(TEST_YEARS)].copy()
-    test_df = df[df["FA_Year"].isin(TEST_YEARS)].copy()
+    test_df = load_and_prepare(TEST_PATH)
+    train_df = df.copy()
     print(f"\nTrain rows: {len(train_df)} | Test rows: {len(test_df)}")
 
     # ── Experiment 1: Ablation ─────────────────────────────────────────────
@@ -322,8 +322,8 @@ def main():
     plot_ablation(p_ablation, "RF Pitcher Ablation", save_path="rf_ablation_pitchers.png")
 
     # ── Experiment 2: Historical window ───────────────────────────────────
-    run_historical_window(df, "hitter", HITTER_ALL)
-    run_historical_window(df, "pitcher", PITCHER_ALL)
+    run_historical_window(df, test_df, "hitter", HITTER_ALL)
+    run_historical_window(df, test_df, "pitcher", PITCHER_ALL)
 
     # ── Experiment 3: Unified vs split ────────────────────────────────────
     p_model, h_model, X_pt, X_ht, X_pte, y_pte, X_hte, y_hte = \
