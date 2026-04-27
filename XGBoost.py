@@ -50,6 +50,56 @@ PITCHER_CONTEXT = ["Age", "Years"]
 PITCHER_ALL = PITCHER_TRADITIONAL + PITCHER_ADVANCED + PITCHER_CONTEXT
 
 
+# POSITION MAPPING  (used by load_2026)
+
+POSITION_MAP = {
+    "sp": "pitcher", "rp": "pitcher", "p": "pitcher",
+    "starting pitcher": "pitcher", "relief pitcher": "pitcher",
+    "c": "hitter", "1b": "hitter", "2b": "hitter", "3b": "hitter",
+    "ss": "hitter", "lf": "hitter", "cf": "hitter", "rf": "hitter",
+    "of": "hitter", "dh": "hitter", "if": "hitter", "util": "hitter",
+}
+
+def assign_position_group(row):
+    pos = str(row.get("Position", "")).lower().strip()
+    if pos in POSITION_MAP:
+        return POSITION_MAP[pos]
+    if pd.notna(row.get("stat_ERA")):
+        return "pitcher"
+    if pd.notna(row.get("stat_PA")):
+        return "hitter"
+    return "unknown"
+
+
+def load_2026(path):
+    df = pd.read_csv(path)
+    stat_cols = [c for c in df.columns if c.startswith("stat_")]
+    df["Position"] = df["Position"].astype(str).str.lower().str.strip()\
+        .map(POSITION_MAP).fillna(df["Position"])
+    for col in stat_cols:
+        df[col] = pd.to_numeric(
+            df[col].astype(str).str.replace(r"[\$,\s]", "", regex=True),
+            errors="coerce"
+        )
+    for col in ["PlayerName", "Player"]:
+        if col in df.columns and "Name" not in df.columns:
+            df.rename(columns={col: "Name"}, inplace=True)
+    df["group"] = df.apply(assign_position_group, axis=1)
+    signed   = df[df["AAV"].notna() & (df["AAV"] > 0)].copy()
+    unsigned = df[df["AAV"].isna()  | (df["AAV"] == 0)].copy()
+    print(f"\n2026 FA class: {len(df)} total")
+    print(f"  Signed:   {len(signed)}")
+    print(f"  Unsigned: {len(unsigned)}")
+    print("\n  Group breakdown:")
+    for grp, cnt in df["group"].value_counts().sort_index().items():
+        print(f"    {grp:<8} {cnt}")
+    # Align with pipeline: map group -> pos_type and log-transform AAV
+    signed["pos_type"] = signed["group"]
+    signed = signed[signed["pos_type"].isin(["pitcher", "hitter"])].copy()
+    signed["log_AAV"] = np.log1p(signed["AAV"])
+    return df, signed, unsigned
+
+
 # HELPERS
 
 
@@ -307,7 +357,7 @@ def run_unified_vs_split(train_df, test_df):
 
 def main():
     df       = load_and_prepare(DATA_PATH)
-    test_df  = load_and_prepare(TEST_PATH)
+    _, test_df, _ = load_2026(TEST_PATH)
     train_df = df.copy()
     print(f"\nTrain rows: {len(train_df)} | Test rows: {len(test_df)}")
 
