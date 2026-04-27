@@ -107,6 +107,17 @@ def load_2026(path):
 
 def load_and_prepare(path):
     df = pd.read_csv(path)
+    stat_cols = [c for c in df.columns if c.startswith("stat_")]
+    for col in stat_cols + ["Age", "Years"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(
+                df[col].astype(str).str.replace(r"[\$,\s]", "", regex=True),
+                errors="coerce"
+            )
+    df[TARGET] = pd.to_numeric(
+        df[TARGET].astype(str).str.replace(r"[\$,\s]", "", regex=True),
+        errors="coerce"
+    )
     df = df[df[TARGET].notna() & (df[TARGET] > 0)].copy()
     df["pos_type"] = "unknown"
     df.loc[df["stat_ERA"].notna(), "pos_type"] = "pitcher"
