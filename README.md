@@ -10,4 +10,4 @@ We used Claude to assist us in coding this project. Taking what we learned from 
 
 
 Directions to run:
-There isn't a need to run bbref.py since all of the csv files are present. Run randomforrest.py and XGBoost.py next. Then run predict_single_year and multi year. After running those, the collab_filtering and shap files should be ran to gather all results. Technically, all of the results are already visible in the github in visualizations. There are a lot, and if we had more time we would have sorted it better (sorrry). 
+There isn't a need to run bbref.py since all of the csv files are present. Run randomforrest.py and XGBoost.py next. Then run predict_single_year and multi year. After running those, the collab_filtering and shap files should be ran to gather all results. Technically, all of the results are already visible in the github in visualizations. There are a lot, and if we had more time we would have sorted it better (sorry). 
