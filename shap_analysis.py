@@ -33,7 +33,6 @@ models, feat_cols, inflation_index, mean_2026 = train_group_models(TRAIN_DATA_PA
 # Reload training data to get X matrices for SHAP
 df = pd.read_csv(TRAIN_DATA_PATH)
 
-# Force numeric columns
 for col in ["AAV", "Guarantee", "Age", "Years", "FA_Year",
             "stat_GS", "stat_ERA", "stat_PA", "stat_G", "stat_IP"]:
     if col in df.columns:
@@ -58,7 +57,6 @@ df = normalize_aav(df, inflation_index)
 
 
 # STEP 2: SHAP Summary Plot (feature importance across all players in group)
-# Shows which features matter most overall for each position group
 
 
 def plot_shap_summary(model, X, group, save_path):
@@ -71,7 +69,6 @@ def plot_shap_summary(model, X, group, save_path):
     explainer   = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X)
 
-    # Clean up feature names for display
     clean_names = [f.replace("stat_stat_", "").replace("stat_", "")
                    for f in X.columns]
 
@@ -120,7 +117,6 @@ def plot_shap_bar(model, X, group, save_path, top_n=12):
 
 
 # STEP 4: SHAP Waterfall for individual players
-# Shows exactly WHY the model predicted what it did for a specific player
 # pick 2-3 interesting cases (overpaid, underpaid, accurate)
 
 def plot_shap_waterfall(model, X, player_name, group, row_index, save_path):
@@ -173,7 +169,6 @@ print("\n=== Individual Player Waterfall Examples ===")
 print("(Edit the PLAYERS_TO_EXPLAIN list below to pick your own examples)\n")
 
 #  Waterfall plots for specific players 
-# Edit this list to pick the players we want to explain in your paper.
 # Format: ("Player Name as in CSV", "GROUP")
 # Good choices: one accurate prediction, one overpaid, one underpaid
 
@@ -194,7 +189,6 @@ for player_name, group in PLAYERS_TO_EXPLAIN:
     features = feat_cols[group]
     X, y, sub_matched = prepare_xy(sub, features, target_col="AAV_norm")
 
-    # Find player row — try CleanName or Name column
     name_col = "CleanName" if "CleanName" in sub_matched.columns else "Name"
     if name_col not in sub_matched.columns:
         print(f"  {player_name}: name column not found, skipping")
@@ -210,7 +204,6 @@ for player_name, group in PLAYERS_TO_EXPLAIN:
         print(f"  {player_name}: not found in training data, skipping")
         continue
 
-    # Get position in X (integer index)
     player_idx = X.index.get_loc(matches.index[0])
 
     plot_shap_waterfall(
