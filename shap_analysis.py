@@ -8,12 +8,12 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# This file runs SHAP analysis on the trained models from predict_second_try.py
-# Run AFTER predict_second_try.py has been run successfully.
+# This file runs SHAP analysis on the trained models from predict_all_multiyear.py
+# Run AFTER predict_all_multiyear.py has been run successfully.
 # It imports the training functions directly so you don't retrain from scratch.
 
-# Import everything from  predict file
-from predict_second_try import (
+# Import everything from predict file
+from predict_all_multiyear import (
     train_group_models,
     prepare_xy,
     GROUP_FEATURES,
@@ -24,7 +24,7 @@ from predict_second_try import (
 )
 
 # 
-# STEP 1: Retrain models (same as predict_second_try.py)
+# STEP 1: Retrain models (same as predict_all_multiyear.py)
 
 
 print("Training models for SHAP analysis...")
@@ -163,11 +163,11 @@ for group, model in models.items():
 
     # Summary plot (beeswarm)
     plot_shap_summary(model, X, group,
-                      save_path=f"shap_summary_{group}.png")
+                      save_path=f"shap_summary_{group}_all_multiyear.png")
 
     # Bar plot 
     plot_shap_bar(model, X, group,
-                  save_path=f"shap_bar_{group}.png")
+                  save_path=f"shap_bar_{group}_all_multiyear.png")
 
 print("\n=== Individual Player Waterfall Examples ===")
 print("(Edit the PLAYERS_TO_EXPLAIN list below to pick your own examples)\n")
@@ -215,7 +215,7 @@ for player_name, group in PLAYERS_TO_EXPLAIN:
 
     plot_shap_waterfall(
         models[group], X, player_name, group, player_idx,
-        save_path=f"shap_waterfall_{player_name.replace(' ', '_')}.png"
+        save_path=f"shap_waterfall_{player_name.replace(' ', '_')}_all_multiyear.png"
     )
 
 print("\nAll SHAP plots saved. Done.")

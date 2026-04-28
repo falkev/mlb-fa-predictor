@@ -15,8 +15,8 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────────────────────────────────────
 
 TRAIN_DATA_PATH = "mlb_fa_training_data_v1.csv"
-PRED_DATA_PATH  = "2026_predictions.csv"    # output from predict_second_try.py
-OUTPUT_PATH     = "team_efficiency.csv"
+PRED_DATA_PATH  = "2026_predictions_all_multiyear.csv"    # output from predict_all_multiyear.py
+OUTPUT_PATH     = "team_efficiency_all_multiyear.csv"
 MIN_SIGNINGS    = 3     # minimum signings for a team to be included
 N_COMPONENTS    = 3     # latent factors for matrix factorization
 
@@ -25,7 +25,7 @@ N_COMPONENTS    = 3     # latent factors for matrix factorization
 # ─────────────────────────────────────────────────────────────────────────────
 
 def assign_position_group(pos, era, gs, pa):
-    """Simplified position classifier matching predict_second_try.py logic."""
+    """Simplified position classifier matching predict_all_multiyear.py logic."""
     pos = str(pos).lower().strip()
     gs  = pd.to_numeric(gs,  errors="coerce")
     era = pd.to_numeric(era, errors="coerce")
@@ -356,7 +356,7 @@ def plot_team_styles(W, matrix, save_path="team_spending_styles.png", n=20):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    print("=== MLB FA Collaborative Filtering — Team Spending Efficiency ===\n")
+    print("=== MLB FA Collaborative Filtering — Team Spending Efficiency (All Multi-Year Stats) ===\n")
 
     # Step 1: Load training data
     print("[Step 1] Loading training data...")
@@ -382,19 +382,19 @@ def main():
     team_overall = analyze_teams(matrix, reconstructed_df, df_filtered)
 
     # Save results
-    matrix.to_csv("team_efficiency_matrix.csv")
-    reconstructed_df.to_csv("team_efficiency_reconstructed.csv")
+    matrix.to_csv("team_efficiency_matrix_all_multiyear.csv")
+    reconstructed_df.to_csv("team_efficiency_reconstructed_all_multiyear.csv")
     team_overall.to_frame("overall_value_score").to_csv(OUTPUT_PATH)
-    print(f"\nSaved: team_efficiency_matrix.csv")
-    print(f"Saved: team_efficiency_reconstructed.csv")
+    print(f"\nSaved: team_efficiency_matrix_all_multiyear.csv")
+    print(f"Saved: team_efficiency_reconstructed_all_multiyear.csv")
     print(f"Saved: {OUTPUT_PATH}")
 
     # Step 6: Plots
     print("\n[Step 6] Generating plots...")
-    plot_heatmap(matrix)
-    plot_team_rankings(team_overall)
-    plot_latent_factors(H, list(matrix.columns))
-    plot_team_styles(W, matrix)
+    plot_heatmap(matrix, save_path="team_efficiency_heatmap_all_multiyear.png")
+    plot_team_rankings(team_overall, save_path="team_overall_efficiency_all_multiyear.png")
+    plot_latent_factors(H, list(matrix.columns), save_path="nmf_latent_factors_all_multiyear.png")
+    plot_team_styles(W, matrix, save_path="team_spending_styles_all_multiyear.png")
 
     print("\nDone.")
 
