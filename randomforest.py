@@ -170,9 +170,11 @@ def evaluate_test(model, X_train, y_train, X_test, y_test, label=""):
     rmse = np.sqrt(mean_squared_error(y_test, preds))
     r2 = r2_score(y_test, preds)
     rmse_dollars = rmse_to_dollars(rmse, y_test)
+    mae_dollars = np.mean(np.abs(np.expm1(y_test.values) - np.expm1(preds)))
     print(f"  {label} [HELD-OUT TEST]")
     print(f"    RMSE (log):  {rmse:.4f}")
     print(f"    RMSE ($M):   ${rmse_dollars / 1e6:.2f}M")
+    print(f"    MAE ($M):    ${mae_dollars / 1e6:.2f}M")
     print(f"    R²:          {r2:.4f}")
     return preds, model
 
@@ -220,14 +222,14 @@ def plot_ablation(results, title, save_path=None):
     ax1.bar(x, r2s, color="forestgreen")
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=20, ha="right")
-    ax1.set_ylabel("CV R²")
+    ax1.set_ylabel("Test R²")
     ax1.set_title(f"{title} — R²")
     ax1.set_ylim(0, max(r2s) * 1.2)
 
     ax2.bar(x, rmses, color="lightcoral")
     ax2.set_xticks(x)
     ax2.set_xticklabels(labels, rotation=20, ha="right")
-    ax2.set_ylabel("CV RMSE (log)")
+    ax2.set_ylabel("Test RMSE (log)")
     ax2.set_title(f"{title} — RMSE")
 
     plt.suptitle(title, fontsize=13, fontweight="bold")
@@ -244,6 +246,9 @@ def plot_predicted_vs_actual(y_true, y_pred, title, save_path=None):
     ax.scatter(actual, pred, alpha=0.6, edgecolors="k", linewidths=0.3, color="forestgreen")
     lims = [min(actual.min(), pred.min()), max(actual.max(), pred.max())]
     ax.plot(lims, lims, "r--", linewidth=1.5, label="Perfect prediction")
+    coeffs = np.polyfit(actual, pred, 2)
+    x_line = np.linspace(actual.min(), actual.max(), 200)
+    ax.plot(x_line, np.polyval(coeffs, x_line), "b-", linewidth=1.5, label="Trendline (quadratic)")
     ax.set_xlabel("Actual AAV ($M)")
     ax.set_ylabel("Predicted AAV ($M)")
     ax.set_title(title)
@@ -258,21 +263,59 @@ def plot_predicted_vs_actual(y_true, y_pred, title, save_path=None):
 # EXPERIMENT 1 — Ablation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_ablation(train_df, pos_type, feature_groups):
+def run_ablation(train_df, test_df, pos_type, feature_groups):
     print(f"\n{'=' * 55}")
     print(f"RF EXPERIMENT 1: ABLATION — {pos_type.upper()}S")
     print(f"{'=' * 55}")
 
-    sub = train_df[train_df["pos_type"] == pos_type]
-    results = {}
+    sub      = train_df[train_df["pos_type"] == pos_type]
+    test_sub = test_df[test_df["pos_type"]   == pos_type]
+    results  = {}
 
+    # Fit every feature group and collect metrics first
     for label, features in feature_groups.items():
-        X, y, _ = prepare_xy(sub, features)
-        if len(X) < 20:
-            print(f"  {label}: not enough rows, skipping")
+        X_train, y_train, _ = prepare_xy(sub,      features)
+        X_test,  y_test,  _ = prepare_xy(test_sub, features)
+        if len(X_train) < 20:
+            print(f"  {label}: not enough training rows, skipping")
             continue
-        rmse, r2 = evaluate_cv(make_model(), X, y, label=label)
-        results[label] = {"rmse": rmse, "r2": r2}
+        if len(X_test) < 5:
+            print(f"  {label}: not enough test rows, skipping")
+            continue
+        model = make_model()
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        results[label] = {
+            "rmse": np.sqrt(mean_squared_error(y_test, preds)),
+            "r2":   r2_score(y_test, preds),
+        }
+
+    # Print: full model first, then deltas for each ablation variant
+    full_label = "Full Data Set"
+    if full_label not in results:
+        # Fallback: treat whichever has the best R² as the baseline
+        full_label = max(results, key=lambda k: results[k]["r2"])
+
+    full_r2   = results[full_label]["r2"]
+    full_rmse = results[full_label]["rmse"]
+    full_rmse_m = np.expm1(full_rmse)
+
+    print(f"\n  Full model ({full_label}):")
+    print(f"    R²:        {full_r2:.4f}")
+    print(f"    RMSE (log): {full_rmse:.4f}  |  RMSE ($M): ${full_rmse_m/1e6:.2f}M")
+
+    print(f"\n  Ablation deltas (vs full model):")
+    for label, res in results.items():
+        if label == full_label:
+            continue
+        delta_r2   = res["r2"]   - full_r2
+        delta_rmse = res["rmse"] - full_rmse
+        delta_rmse_m = np.expm1(res["rmse"]) - full_rmse_m
+        r2_sign   = "+" if delta_r2   >= 0 else ""
+        rmse_sign = "+" if delta_rmse >= 0 else ""
+        print(f"  {label:<22}  ΔR²: {r2_sign}{delta_r2:.4f}   "
+              f"ΔRMSE (log): {rmse_sign}{delta_rmse:.4f}   "
+              f"ΔRMSE ($M): {rmse_sign}{delta_rmse_m/1e6:.2f}M")
 
     return results
 
@@ -328,26 +371,27 @@ def run_unified_vs_split(train_df, test_df):
     unified_features = list(set(HITTER_ALL + PITCHER_ALL))
 
     X_train_u, y_train_u, _ = prepare_xy(train_df, unified_features)
-    X_test_u, y_test_u, _ = prepare_xy(test_df, unified_features)
-    print("\nUnified model (all positions):")
-    evaluate_cv(make_model(), X_train_u, y_train_u, label="Unified CV")
-    evaluate_test(make_model(), X_train_u, y_train_u,
-                  X_test_u, y_test_u, label="Unified")
+    X_test_u,  y_test_u,  _ = prepare_xy(test_df,  unified_features)
 
-    print("\nSplit models (pitchers and hitters separately):")
     p_train = train_df[train_df["pos_type"] == "pitcher"]
     h_train = train_df[train_df["pos_type"] == "hitter"]
-    p_test = test_df[test_df["pos_type"] == "pitcher"]
-    h_test = test_df[test_df["pos_type"] == "hitter"]
+    p_test  = test_df[test_df["pos_type"]  == "pitcher"]
+    h_test  = test_df[test_df["pos_type"]  == "hitter"]
 
-    X_pt, y_pt, _ = prepare_xy(p_train, PITCHER_ALL)
-    X_ht, y_ht, _ = prepare_xy(h_train, HITTER_ALL)
-    X_pte, y_pte, _ = prepare_xy(p_test, PITCHER_ALL)
-    X_hte, y_hte, _ = prepare_xy(h_test, HITTER_ALL)
+    X_pt,  y_pt,  _ = prepare_xy(p_train, PITCHER_ALL)
+    X_ht,  y_ht,  _ = prepare_xy(h_train, HITTER_ALL)
+    X_pte, y_pte, _ = prepare_xy(p_test,  PITCHER_ALL)
+    X_hte, y_hte, _ = prepare_xy(h_test,  HITTER_ALL)
 
-    evaluate_cv(make_model(), X_pt, y_pt, label="Pitchers CV")
-    evaluate_cv(make_model(), X_ht, y_ht, label="Hitters CV")
+    # ── Cross-validation (all three) ──────────────────────────────────────
+    print("\n--- Cross-Validation ---")
+    evaluate_cv(make_model(), X_train_u, y_train_u, label="Unified CV")
+    evaluate_cv(make_model(), X_pt,      y_pt,      label="Pitchers CV")
+    evaluate_cv(make_model(), X_ht,      y_ht,      label="Hitters CV")
 
+    # ── Test on 2026 data (all three) ─────────────────────────────────────
+    print("\n--- Test on 2026 Data ---")
+    evaluate_test(make_model(), X_train_u, y_train_u, X_test_u, y_test_u, label="Unified")
     preds_p, p_model = evaluate_test(make_model(), X_pt, y_pt, X_pte, y_pte, label="Pitchers")
     preds_h, h_model = evaluate_test(make_model(), X_ht, y_ht, X_hte, y_hte, label="Hitters")
 
@@ -366,20 +410,20 @@ def main():
 
     # ── Experiment 1: Ablation ─────────────────────────────────────────────
     hitter_ablation_groups = {
-        "Traditional only": HITTER_TRADITIONAL + HITTER_CONTEXT,
-        "Advanced only": HITTER_ADVANCED + HITTER_CONTEXT,
-        "Trad + Advanced": HITTER_ALL,
-        "No age/years": HITTER_TRADITIONAL + HITTER_ADVANCED,
+        "Full Data Set":        HITTER_ALL,
+        "No Advanced Stats":    HITTER_TRADITIONAL + HITTER_CONTEXT,
+        "No Traditional Stats": HITTER_ADVANCED    + HITTER_CONTEXT,
+        "No Context Variables": HITTER_TRADITIONAL + HITTER_ADVANCED,
     }
     pitcher_ablation_groups = {
-        "Traditional only": PITCHER_TRADITIONAL + PITCHER_CONTEXT,
-        "Advanced only": PITCHER_ADVANCED + PITCHER_CONTEXT,
-        "Trad + Advanced": PITCHER_ALL,
-        "No age/years": PITCHER_TRADITIONAL + PITCHER_ADVANCED,
+        "Full Data Set":        PITCHER_ALL,
+        "No Advanced Stats":    PITCHER_TRADITIONAL + PITCHER_CONTEXT,
+        "No Traditional Stats": PITCHER_ADVANCED    + PITCHER_CONTEXT,
+        "No Context Variables": PITCHER_TRADITIONAL + PITCHER_ADVANCED,
     }
 
-    h_ablation = run_ablation(train_df, "hitter", hitter_ablation_groups)
-    p_ablation = run_ablation(train_df, "pitcher", pitcher_ablation_groups)
+    h_ablation = run_ablation(train_df, test_df, "hitter", hitter_ablation_groups)
+    p_ablation = run_ablation(train_df, test_df, "pitcher", pitcher_ablation_groups)
 
     plot_ablation(h_ablation, "RF Hitter Ablation", save_path="rf_ablation_hitters.png")
     plot_ablation(p_ablation, "RF Pitcher Ablation", save_path="rf_ablation_pitchers.png")
