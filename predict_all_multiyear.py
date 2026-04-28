@@ -25,7 +25,7 @@ SP_GS_THRESHOLD = 10
 POSITION_MAP = {
     "rhp-s": "17", "lhp-s": "20",           # SP
     "rhp-c": "16", "lhp-c": "19",           # closer
-    "rhp":   "18", "lhp":   "15",           # RP generic
+    "rhp":   "18", "lhp":   "15",           # RP
     "c":     "1",  "c-dh":  "1",            # catcher
     "1b":    "3",  "1b-dh": "3",  "1b-of": "3",  "1b-3b": "3",
     "dh":    "14", "dh-rf": "14", "dh-of": "14", "dh-lf": "14",
