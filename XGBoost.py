@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use("Agg")  # non-interactive backend — saves files, no display window
+matplotlib.use("Agg") 
 import matplotlib.pyplot as plt
 from xgboost import XGBRegressor
 from sklearn.model_selection import KFold, cross_val_score
@@ -16,7 +16,7 @@ TEST_PATH   = "mlb_fa_2026.csv"
 TARGET      = "AAV"
 RANDOM_SEED = 42
 
-# FEATURE SETS  — matched to actual B-Ref column names in the CSV
+# FEATURE SETS
 
 
 # --- Hitter feature groups ---
@@ -42,15 +42,15 @@ PITCHER_TRADITIONAL = [
 ]
 PITCHER_ADVANCED = [
     "stat_WAR", "stat_FIP", "stat_ERA+",
-    "stat_SO/BB",           # native B-Ref column
-    "stat_stat_SO_W",       # SO / BB  (engineered in bbref.py — same ratio, kept both)
+    "stat_SO/BB",           
+    "stat_stat_SO_W", 
 ]
 PITCHER_CONTEXT = ["Age", "Years"]
 
 PITCHER_ALL = PITCHER_TRADITIONAL + PITCHER_ADVANCED + PITCHER_CONTEXT
 
 
-# POSITION MAPPING  (used by load_2026)
+# POSITION MAPPING
 
 POSITION_MAP = {
     "sp": "pitcher", "rp": "pitcher", "p": "pitcher",
@@ -93,7 +93,6 @@ def load_2026(path):
     print("\n  Group breakdown:")
     for grp, cnt in df["group"].value_counts().sort_index().items():
         print(f"    {grp:<8} {cnt}")
-    # Align with pipeline: map group -> pos_type and log-transform AAV
     signed["pos_type"] = signed["group"]
     signed = signed[signed["pos_type"].isin(["pitcher", "hitter"])].copy()
     signed["log_AAV"] = np.log1p(signed["AAV"])
@@ -118,11 +117,9 @@ def load_and_prepare(path):
     )
     df = df[df[TARGET].notna() & (df[TARGET] > 0)].copy()
 
-    # Classify using stat presence — Position column has mixed/unreliable encoding
     df["pos_type"] = "unknown"
     df.loc[df["stat_ERA"].notna(), "pos_type"] = "pitcher"
     df.loc[df["stat_PA"].notna(),  "pos_type"] = "hitter"
-    # Drop rows where no stats were found (can't predict without features)
     df = df[df["pos_type"] != "unknown"].copy()
 
     # Log-transform target — AAV is right-skewed
@@ -275,7 +272,6 @@ def run_ablation(train_df, test_df, pos_type, feature_groups):
     test_sub = test_df[test_df["pos_type"]   == pos_type]
     results  = {}
 
-    # Fit every feature group and collect metrics first
     for label, features in feature_groups.items():
         X_train, y_train, _ = prepare_xy(sub,      features)
         X_test,  y_test,  _ = prepare_xy(test_sub, features)
@@ -387,13 +383,13 @@ def run_unified_vs_split(train_df, test_df):
     X_pte, y_pte, _ = prepare_xy(p_test,  PITCHER_ALL)
     X_hte, y_hte, _ = prepare_xy(h_test,  HITTER_ALL)
 
-    # ── Cross-validation (all three) ──────────────────────────────────────
+    # ── Cross-validation (all three) 
     print("\n--- Cross-Validation ---")
     evaluate_cv(make_model(), X_train_u, y_train_u, label="Unified CV")
     evaluate_cv(make_model(), X_pt,      y_pt,      label="Pitchers CV")
     evaluate_cv(make_model(), X_ht,      y_ht,      label="Hitters CV")
 
-    # ── Test on 2026 data (all three) ─────────────────────────────────────
+    # ── Test on 2026 data
     print("\n--- Test on 2026 Data ---")
     evaluate_test(make_model(), X_train_u, y_train_u, X_test_u, y_test_u, label="Unified")
     p_model = make_model()
