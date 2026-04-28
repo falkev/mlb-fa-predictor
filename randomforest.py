@@ -11,18 +11,16 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CONFIG  (must match xgboost_model.py exactly)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# CONFIG
+
 
 DATA_PATH = "mlb_fa_data_cleaned - mlb fa_training_data_v1.csv.csv"
 TEST_PATH = "mlb_fa_2026.csv"
 TARGET = "AAV"
 RANDOM_SEED = 42
 
-# ─────────────────────────────────────────────────────────────────────────────
 # FEATURE SETS  (identical to xgboost_model.py)
-# ─────────────────────────────────────────────────────────────────────────────
 
 HITTER_TRADITIONAL = [
     "stat_G", "stat_PA", "stat_HR", "stat_R", "stat_RBI", "stat_SB",
@@ -49,9 +47,7 @@ PITCHER_CONTEXT = ["Age", "Years"]
 PITCHER_ALL = PITCHER_TRADITIONAL + PITCHER_ADVANCED + PITCHER_CONTEXT
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # POSITION MAPPING  (used by load_2026)
-# ─────────────────────────────────────────────────────────────────────────────
 
 POSITION_MAP = {
     "sp": "pitcher", "rp": "pitcher", "p": "pitcher",
@@ -72,9 +68,7 @@ def assign_position_group(row):
     return "unknown"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
 
 def load_2026(path):
     df = pd.read_csv(path)
@@ -137,7 +131,6 @@ def get_features(df, feature_list):
 def prepare_xy(df, feature_list):
     cols = get_features(df, feature_list)
     X = df[cols].copy()
-    # Random Forest can't handle NaN — fill with column median
     X = X.fillna(X.median())
     y = df["log_AAV"].copy()
     mask = y.notna()
@@ -182,17 +175,15 @@ def evaluate_test(model, X_train, y_train, X_test, y_test, label=""):
 def make_model():
     return RandomForestRegressor(
         n_estimators=500,
-        max_depth=None,  # let trees grow fully — RF is robust to this
-        min_samples_leaf=3,  # prevents overfitting on small groups
-        max_features="sqrt",  # standard for regression RF
+        max_depth=None,
+        min_samples_leaf=3, 
+        max_features="sqrt", 
         random_state=RANDOM_SEED,
         n_jobs=-1,
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # PLOTS
-# ─────────────────────────────────────────────────────────────────────────────
 
 def plot_feature_importance(model, feature_names, title, top_n=15, save_path=None):
     importances = model.feature_importances_
@@ -259,10 +250,8 @@ def plot_predicted_vs_actual(y_true, y_pred, title, save_path=None):
         print(f"  Saved: {save_path}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # EXPERIMENT 1 — Ablation
-# ─────────────────────────────────────────────────────────────────────────────
-
+#---------------------------------------------------------------------------------
 def run_ablation(train_df, test_df, pos_type, feature_groups):
     print(f"\n{'=' * 55}")
     print(f"RF EXPERIMENT 1: ABLATION — {pos_type.upper()}S")
@@ -272,7 +261,6 @@ def run_ablation(train_df, test_df, pos_type, feature_groups):
     test_sub = test_df[test_df["pos_type"]   == pos_type]
     results  = {}
 
-    # Fit every feature group and collect metrics first
     for label, features in feature_groups.items():
         X_train, y_train, _ = prepare_xy(sub,      features)
         X_test,  y_test,  _ = prepare_xy(test_sub, features)
@@ -290,7 +278,6 @@ def run_ablation(train_df, test_df, pos_type, feature_groups):
             "r2":   r2_score(y_test, preds),
         }
 
-    # Print: full model first, then deltas for each ablation variant
     full_label = "Full Data Set"
     if full_label not in results:
         # Fallback: treat whichever has the best R² as the baseline
@@ -320,7 +307,6 @@ def run_ablation(train_df, test_df, pos_type, feature_groups):
     return results
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # EXPERIMENT 2 — Historical window
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -359,7 +345,6 @@ def run_historical_window(df, test_df, pos_type, feature_list):
     return results
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # EXPERIMENT 3 — Unified vs split
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -383,13 +368,13 @@ def run_unified_vs_split(train_df, test_df):
     X_pte, y_pte, _ = prepare_xy(p_test,  PITCHER_ALL)
     X_hte, y_hte, _ = prepare_xy(h_test,  HITTER_ALL)
 
-    # ── Cross-validation (all three) ──────────────────────────────────────
+    # ── Cross-validation
     print("\n--- Cross-Validation ---")
     evaluate_cv(make_model(), X_train_u, y_train_u, label="Unified CV")
     evaluate_cv(make_model(), X_pt,      y_pt,      label="Pitchers CV")
     evaluate_cv(make_model(), X_ht,      y_ht,      label="Hitters CV")
 
-    # ── Test on 2026 data (all three) ─────────────────────────────────────
+    # ── Test on 2026 data (all three)
     print("\n--- Test on 2026 Data ---")
     evaluate_test(make_model(), X_train_u, y_train_u, X_test_u, y_test_u, label="Unified")
     preds_p, p_model = evaluate_test(make_model(), X_pt, y_pt, X_pte, y_pte, label="Pitchers")
@@ -398,9 +383,9 @@ def run_unified_vs_split(train_df, test_df):
     return p_model, h_model, X_pt, X_ht, X_pte, y_pte, X_hte, y_hte
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # MAIN
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def main():
     df = load_and_prepare(DATA_PATH)
@@ -408,7 +393,7 @@ def main():
     train_df = df.copy()
     print(f"\nTrain rows: {len(train_df)} | Test rows: {len(test_df)}")
 
-    # ── Experiment 1: Ablation ─────────────────────────────────────────────
+    # ── Experiment 1: Ablation 
     hitter_ablation_groups = {
         "Full Data Set":        HITTER_ALL,
         "No Advanced Stats":    HITTER_TRADITIONAL + HITTER_CONTEXT,
@@ -428,15 +413,15 @@ def main():
     plot_ablation(h_ablation, "RF Hitter Ablation", save_path="rf_ablation_hitters.png")
     plot_ablation(p_ablation, "RF Pitcher Ablation", save_path="rf_ablation_pitchers.png")
 
-    # ── Experiment 2: Historical window ───────────────────────────────────
+    # ── Experiment 2: Historical window 
     run_historical_window(df, test_df, "hitter", HITTER_ALL)
     run_historical_window(df, test_df, "pitcher", PITCHER_ALL)
 
-    # ── Experiment 3: Unified vs split ────────────────────────────────────
+    # ── Experiment 3: Unified vs split 
     p_model, h_model, X_pt, X_ht, X_pte, y_pte, X_hte, y_hte = \
         run_unified_vs_split(train_df, test_df)
 
-    # ── Feature importance ────────────────────────────────────────────────
+    # ── Feature importance 
     print("\nGenerating feature importance plots...")
     plot_feature_importance(p_model, list(X_pt.columns),
                             "RF Top Pitcher Features",
@@ -445,7 +430,7 @@ def main():
                             "RF Top Hitter Features",
                             save_path="rf_importance_hitters.png")
 
-    # ── Predicted vs actual ───────────────────────────────────────────────
+    # ── Predicted vs actual 
     preds_h = h_model.predict(X_hte)
     plot_predicted_vs_actual(y_hte, preds_h,
                              "RF Predicted vs Actual AAV — Hitters (Test Set)",
